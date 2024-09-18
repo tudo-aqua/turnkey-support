@@ -235,9 +235,7 @@ val maven by
     }
 
 signing {
-  setRequired {
-    gradle.taskGraph.allTasks.filterIsInstance<PublishToMavenRepository>().isNotEmpty()
-  }
+  setRequired { gradle.taskGraph.allTasks.any { it is PublishToMavenRepository } }
   useGpgCmd()
   sign(maven)
 }
