@@ -1,96 +1,117 @@
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/tudo-aqua/z3-turnkey/test.yml?branch=master)](https://github.com/tudo-aqua/z3-turnkey/actions)
-[![JavaDoc](https://javadoc.io/badge2/tools.aqua/z3-turnkey/javadoc.svg)](https://javadoc.io/doc/tools.aqua/z3-turnkey)
-[![Maven Central](https://img.shields.io/maven-central/v/tools.aqua/z3-turnkey?logo=apache-maven)](https://search.maven.org/artifact/tools.aqua/z3-turnkey)
-### The Z3-TurnKey Distribution
+<!--
+   SPDX-License-Identifier: CC-BY-4.0
 
-[The Z3 Theorem Prover](https://github.com/Z3Prover/z3/) is a widely used SMT solver that is written in C and C++. The
-authors provide a Java API, however, it is not trivial to set up in a Java project. This project aims to solve this
-issue.
+   Copyright 2019-2024 The TurnKey Authors
 
-#### Why?
+   This work is licensed under the Creative Commons Attribution 4.0
+   International License.
 
-The Z3 API is hard-coded to load its libraries from the OS's library directory (e.g., `/usr/lib`, `/usr/local/lib`,
-etc. on Linux). These directories should not be writable by normal users. The expected workflow to use Z3 from Java
-would therefore require installing a matching version of the Z3 native libraries as an administrator before using the
-Java bindings.
+   You should have received a copy of the license along with this
+   work. If not, see <https://creativecommons.org/licenses/by/4.0/>.
+-->
 
-Effectively, this makes the creation of Java applications that can be downloaded and run by a user impossible. It would
-be preferable to have a Java artifact that
-1. ships its own native libraries,
-2. can use them without administrative privileges, and
-3. can be obtained using [Maven](https://maven.apache.org/).
+# TurnKey Support Library
 
-#### Usage
+This is a support library for loading and writing TurnKey bundles. A TurnKey bundle is a Java
+library that depends on a native library which is included in the JAR archive and unpacked at
+runtime. This requires distributing the library and its dependencies for all supported platforms
+inside the JAR.
 
-The artifact is intended as a drop-in replacement for the unpublished Z3 JAR. If your project works with the latter, it
-should continue to work after substituting `z3-turnkey`. The artifact is published via Maven Central. To use it with
-your preferred build management system, you can use a snippet from the
-[Maven Central Repository Search](https://search.maven.org/artifact/tools.aqua/z3-turnkey) by selecting the correct
-version.
+However, loading libraries in the JVM is only possible if these libraries are present in the file
+system. Therefore, all required libraries are unpacked to a temporary directory by the support
+library. Additionally, loading of dependencies can not be done in a fully platform-agnostic way: for
+some platforms, libraries can be (re-) linked to search for their dependencies in the same
+directory, while for others, the dependencies must be explicitly loaded by the JVM beforehand. A
+TurnKey bundle therefore includes a metadata file that a) lists all required libraries and b) lists
+the required library load commands for the target platform in order.
 
-#### How?
+A TurnKey bundle is identified by a _prefix_, which should correspond to the package name used by
+the library's Java code (e.g., a JNI binding) to avoid namespace conflicts.
 
-This project consists of two parts:
-1. a Java loader, `Z3Loader`, that handles runtime unpacking and linking of the native support libraries, and
-2. a build system that create a JAR from the official Z3 distributions that
-    1. contains all native support libraries built by the Z3 project,
-    2. replaces the hard-coded system library loader with `Z3Loader` by rewriting the Z3 source code,
-    3. fixes the OS X library's search path to a relative one, and
-    3. bundles all of the required files.
-Also, JavaDoc and source JARs are generated for ease of use.
+## Loading TurnKey Bundles
 
-#### Building
+The support library is published as a
+[Maven artifact on Maven Central](https://central.sonatype.com/artifact/tools.aqua/turnkey-support)
+and can be included in every Maven-supporting build tool.
 
-The project is built using [Gradle](https://gradle.org/). In addition to Java 11 or higher, building requires Python 3,
-an `install_name_tool` for OS X and a GPG signature key.
+The library defines a single entry point for loading bundles, `TurnKey.load`. This method accepts
+the bundle prefix and a function that can be used to load libraries, usually the loading class'
+`getResourceAsStream` method. The latter is necessary to handle Java modularity, sind the libraries
+can only be accessed from code in the same module, not the support library.
 
-The project can be built and tested on the current platform using:
-> ./gradlew assemble integrationTest
+A sensible place for calling this method is the static initializer of, e.g., a JNI wrapper class:
 
-##### Python 3
+```java
+package com.acme.example;
 
-Python 3 can be acquired as follows:
-- Windows users can use the [official installer](https://www.python.org/downloads/windows/). When using the
-  [Chocolatey package manager](https://chocolatey.org/), Python can be installed using
-  > choco install python
-- OS X users can use the [official installer](https://www.python.org/downloads/mac-osx/). When using the
-  [Homebrew package manager](https://brew.sh/), Python can be installer using
-  > brew install python
-- Linux users should install the Python package provided by their distribution. Most likely, it is already present.
+import tools.aqua.turnkey.support.TurnKey;
 
-Python 3 is discovered by the build script using [https://github.com/xvik/gradle-use-python-plugin].
+class Example {
+    static {
+        TurnKey.load("com/acme/example", Example.class::getResourceAsStream);
+    }
+}
 
-##### `install_name_tool`
+```
 
-An `install_name_tool` can be acquired as follows:
-- Windows users will need to experiment with Cygwin/MinGW or Docker.
-- OS X already ships an `install_name_tool`.
-- Linux users can use the version shipped by LLVM. 
+## Authoring TurnKey Bundles
 
-The `install_name_tool` binary is discovered as follows:
-1. If the project parameter `install_name_tool` is set, its value is used.
-2. Else, `install_name_tool` is tried and used if it exists. This should be the case on OS X.
-3. Else, `llvm-install-name-tool` is tried and used if it exists. This should be the case on other OSes with LLVM 
-   installed.
-4. Else, the build fails.
+A TurnKey bundle can be constructed by placing all required files in a specific structure and adding
+a metadata file. Supported platforms are defined by _operating system_ and _CPU architecture_. The
+JAR file should then contain all required files at `$prefix/$os/$arch`.
 
-Without an `install_name_tool`, a build can be created by setting the parameter to the `true` application. However, the
-resulting artifact *will not work on OS X*!
-> ./gradlew -Pinstall_name_tool=true assemble integrationTest
+For each supported platform, the file `turnkey.xml` _must_ be present. It can be authored via the
+`TurnKeyMetadata` class.
 
-##### Signing
+### Metadata File
 
-Normally, Gradle will enforce a GPG signature on the artifacts. By setting the project parameter `skip-signing`,
-enforcement is disabled:
-> ./gradlew -Pskip-signing assemble
+The `turnkey.xml` file defines all metadata for the required support files. It is a Java Properties
+XML file that stores collections of items as follows: for the list key `k`, the contents of `k` are
+stored as `k.0`, `k.1`, etc. Each metadata file contains:
 
-##### Releasing
+- the set `bundled-libraries`, containing all files that must be unpacked from the support file
+  directory for the native code to work,
+- the set `system-libraries`, containing all system libraries that are not bundled but must be
+  present for the library to work (at the moment, this information is not used by the support
+  library), and
+- the list `load-command`, listing the required libraries in load order. If the platform support
+  linking to libraries in the same directory, this will usually only contain a “root” library, if
+  not, it will contain the dependency graph in inverse topological order.
 
-This project uses the `maven-pubish` plugin in combination with the `Gradle Nexus Publish Plugin`.
-To publis and autoclose a version, run `./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository`
-as one command. Due to [WIP in the Gradle Nexus Publish Plugin](https://github.com/gradle-nexus/publish-plugin/issues/19) this has to be run in conjunction for now.
+### Layout Example
 
-#### License
+For the library `libexample.so` by _ACME, Inc._, a TurnKey bundle might contain:
 
-Z3 is licensed under the [MIT License](https://github.com/Z3Prover/z3/blob/master/LICENSE.txt). The support files in
-this project are licensed under the [ISC License](https://opensource.org/licenses/ISC).
+```text
+com/acme/example/Example.class            # JNI binding
+com/acme/example/windows/x86/turnkey.xml  # Windows x86 metadata
+com/acme/example/windows/x86/example.dll  # Windows x86 library file
+com/acme/example/linux/amd64/turnkey.xml  # Linux AMD64 metadata
+com/acme/example/linux/amd64/example.so   # Linux AMD64 library file
+```
+
+## Java, JPMS Support, and Nullability
+
+The library requires Java 8. It can be used as a Java module on Java 9+ via the multi-release JAR
+mechanism as the `tools.aqua.turnkey.support` module. It uses [JSpecify](https://jspecify.dev/)
+annotations to declare nullability metadata.
+
+## License
+
+The support library's runtime code is released under the
+[ISC License]("https://opensource.org/licenses/ISC"). Tests and other non-runtime code are licensed
+under the [Apache Licence, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). Standalone
+documentation is licensed under the
+[Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).
+The library uses [JSpecify](https://jspecify.dev/) annotations, which are licensed under the
+[Apache Licence, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
+## See Also
+
+The [gradle-turnkey-plugin](https://github.com/tudo-aqua/gradle-turnkey-plugin) provides facilities
+for rewriting non-TurnKey library files as well as modifying Java source code (to insert calls to
+this library) via Gradle.
+
+At the moment, two libraries are using this infrastructure:
+[Z3-TurnKey](https://github.com/tudo-aqua/z3-turnkey) and
+[cvc5-TurnKey](https://github.com/tudo-aqua/cvc5-turnkey).
