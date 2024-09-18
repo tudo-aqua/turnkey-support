@@ -124,7 +124,7 @@ spotless {
   }
   format("markdown") {
     target("*.md")
-    licenseHeaderFile(project.file("config/license/CC-BY-4.0-xmlstyle"), "#+")
+    licenseHeaderFile(project.file("config/license/CC-BY-4.0-xmlstyle"), """(#+|\[!\[)""")
         .updateYearWithLatest(true)
     prettier()
         .npmInstallCache()

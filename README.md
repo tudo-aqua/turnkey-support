@@ -10,6 +10,10 @@
    work. If not, see <https://creativecommons.org/licenses/by/4.0/>.
 -->
 
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/tudo-aqua/turnkey-support/ci.yml?logo=githubactions)](https://github.com/tudo-aqua/turnkey-support/actions)
+[![JavaDoc](https://javadoc.io/badge2/tools.aqua/turnkey-support/javadoc.svg)](https://javadoc.io/doc/tools.aqua/turnkey-support)
+[![Maven Central](https://img.shields.io/maven-central/v/tools.aqua/turnkey-support?logo=apache-maven)](https://search.maven.org/artifact/tools.aqua/turnkey-support)
+
 # TurnKey Support Library
 
 This is a support library for loading and writing TurnKey bundles. A TurnKey bundle is a Java
