@@ -222,7 +222,8 @@ val maven by
           developer {
             name = "Simon Dierl"
             email = "simon.dierl@tu-dortmund.de"
-            organization = "TU Dortmund University"
+            organization = "AQUA Group, Department of Computer Science, TU Dortmund University"
+            organizationUrl = "https://aqua.engineering/"
           }
         }
         scm {
