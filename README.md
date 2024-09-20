@@ -112,7 +112,7 @@ The library uses [JSpecify](https://jspecify.dev/) annotations, which are licens
 
 ## See Also
 
-The [gradle-turnkey-plugin](https://github.com/tudo-aqua/gradle-turnkey-plugin) provides facilities
+The [turnkey-gradle-plugin](https://github.com/tudo-aqua/turnkey-gradle-plugin) provides facilities
 for rewriting non-TurnKey library files as well as modifying Java source code (to insert calls to
 this library) via Gradle.
 
