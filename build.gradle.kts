@@ -74,6 +74,7 @@ repositories { mavenCentral() }
 dependencies {
   api(libs.jspecify)
 
+  testImplementation(platform(libs.junit))
   testImplementation(libs.assertj.core)
   testImplementation(libs.junit.jupiter)
   testRuntimeOnly(libs.junit.launcher)
